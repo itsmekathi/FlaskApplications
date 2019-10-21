@@ -1,10 +1,12 @@
-from flask import Flask, request, make_response, redirect, url_for, abort, render_template
+from flask import Flask, request, make_response, redirect, url_for, abort, render_template, session, redirect, flash
 from flask_script import Manager
 from flask_bootstrap import Bootstrap
 from flask_moment import Moment
 from datetime import datetime
+from forms import NameForm
 
 app = Flask(__name__)
+app.config['SECRET_KEY'] = 'hard to guess string'
 Bootstrap(app)
 moment = Moment(app)
 manager = Manager(app)
@@ -26,6 +28,19 @@ def user_by_id(id):
 @app.route('/error')
 def error():
     return '<h1>Bad request</h1>', 400
+
+@app.route('/user/new', methods=['GET','POST'])
+def new_user():
+    form = NameForm()
+    if form.validate_on_submit():
+        old_name = session.get('name')
+        if old_name is not None and old_name != form.name.data:
+            flash('Looks like you have changed your name!')
+            flash('If you want to undo your action, do it manually')
+        session['name'] = form.name.data
+        form.name.data =''
+        return redirect(url_for('home'))
+    return render_template('newuser.html', form=form, name=session.get('name'))
 
 @app.errorhandler(404)
 def page_not_found(e):
