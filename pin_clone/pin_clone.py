@@ -18,7 +18,7 @@ db.create_all()
 
 @app.route('/')
 def hello_world():
-    return 'Hello World!'
+    return app.send_static_file("index.html")
 
 
 app.debug = True

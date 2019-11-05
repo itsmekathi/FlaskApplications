@@ -2,14 +2,43 @@ from flask import Flask, request, make_response, redirect, url_for, abort, rende
 from flask_script import Manager
 from flask_bootstrap import Bootstrap
 from flask_moment import Moment
+from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from forms import NameForm
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'hard to guess string'
+app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///data.db"
+app.config['SQLALCHEMY_COMMIT_ON_TEARDOWN'] = True
+db = SQLAlchemy(app)
+
 Bootstrap(app)
 moment = Moment(app)
 manager = Manager(app)
+
+# Models section
+class Role(db.Model):
+    __tablename__ = 'roles'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(64), unique=True)
+    users = db.relationship('User', backref='role', lazy='dynamic')
+
+    def __repr__(self):
+        return '<Role %r>' % self.name
+
+class User(db.Model):
+    __tablename__ ='users'
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(64), unique=True, index=True)
+    role_id = db.Column(db.Integer, db.ForeignKey('roles.id'))
+
+    def __repr__(self):
+        return '<User %r>' % self.username
+
+
+
+
+
 
 @app.route('/')
 @app.route('/index')
@@ -33,14 +62,18 @@ def error():
 def new_user():
     form = NameForm()
     if form.validate_on_submit():
-        old_name = session.get('name')
-        if old_name is not None and old_name != form.name.data:
+        user = User.query.filter_by(username=form.name.data).first()
+        if user is None:
+            user = User(username=form.name.data)
+            db.session.add(user)
+            session['known'] = False
             flash('Looks like you have changed your name!')
-            flash('If you want to undo your action, do it manually')
+        else:
+            session['known'] = True
         session['name'] = form.name.data
-        form.name.data =''
+        form.name.data = ''
         return redirect(url_for('home'))
-    return render_template('newuser.html', form=form, name=session.get('name'))
+    return render_template('newuser.html', form=form, name=session.get('name'), known=session.get('known', False))
 
 @app.errorhandler(404)
 def page_not_found(e):
